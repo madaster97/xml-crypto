@@ -53,6 +53,32 @@ export class RsaSha256 implements SignatureAlgorithm {
   };
 }
 
+export class EcdsaSha256 implements SignatureAlgorithm {
+  getSignature = createOptionalCallbackFunction(
+    (signedInfo: crypto.BinaryLike, privateKey: crypto.KeyLike): string => {
+      const signer = crypto.createSign("SHA256");
+      signer.update(signedInfo);
+      const res = signer.sign(privateKey, "base64");
+
+      return res;
+    },
+  );
+
+  verifySignature = createOptionalCallbackFunction(
+    (material: string, key: crypto.KeyLike, signatureValue: string): boolean => {
+      const verifier = crypto.createVerify("SHA256");
+      verifier.update(material);
+      const res = verifier.verify(key, signatureValue, "base64");
+
+      return res;
+    },
+  );
+
+  getAlgorithmName = () => {
+    return "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256";
+  };
+}
+
 export class RsaSha256Mgf1 implements SignatureAlgorithm {
   getSignature = createOptionalCallbackFunction(
     (signedInfo: crypto.BinaryLike, privateKey: crypto.KeyLike): string => {
