@@ -12,7 +12,10 @@ const signatureAlgorithms = [
   "http://www.w3.org/2007/05/xmldsig-more#sha256-rsa-MGF1",
   "http://www.w3.org/2001/04/xmldsig-more#rsa-sha512",
 ];
-const ecdsaSignatureAlgorithm = "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256";
+const ecdsaSignatureAlgorithms = [
+  "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256",
+  "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha512",
+];
 
 describe("Signature unit tests", function () {
   describe("sign and verify", function () {
@@ -77,72 +80,63 @@ describe("Signature unit tests", function () {
   });
 
   describe("sign and verify - ecdsa", function () {
-    const signatureAlgorithm = ecdsaSignatureAlgorithm;
-    function signWith(signatureAlgorithm: string): string {
-      const xml = '<root><x attr="value"></x></root>';
-      const sig = new SignedXml();
-      sig.privateKey = fs.readFileSync("./test/static/client_ecdsa.pem");
+    ecdsaSignatureAlgorithms.forEach((signatureAlgorithm) => {
+      function signWith(signatureAlgorithm: string): string {
+        const xml = '<root><x attr="value"></x></root>';
+        const sig = new SignedXml();
+        sig.privateKey = fs.readFileSync("./test/static/client_ecdsa.pem");
 
-      sig.addReference({
-        xpath: "//*[local-name(.)='x']",
-        digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
-        transforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"],
+        sig.addReference({
+          xpath: "//*[local-name(.)='x']",
+          digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
+          transforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"],
+        });
+
+        sig.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#";
+        sig.signatureAlgorithm = signatureAlgorithm;
+        sig.computeSignature(xml);
+        return sig.getSignedXml();
+      }
+
+      function loadSignature(xml: string): SignedXml {
+        const doc = new xmldom.DOMParser().parseFromString(xml);
+        const node = xpath.select1(
+          "//*[local-name(.)='Signature' and namespace-uri(.)='http://www.w3.org/2000/09/xmldsig#']",
+          doc,
+        );
+        isDomNode.assertIsNodeLike(node);
+        const sig = new SignedXml();
+        sig.publicCert = fs.readFileSync("./test/static/client_public_ecdsa.pem");
+        sig.loadSignature(node);
+        return sig;
+      }
+
+      it(`should verify signed xml with ${signatureAlgorithm}`, function () {
+        const xml = signWith(signatureAlgorithm);
+        const sig = loadSignature(xml);
+        const res = sig.checkSignature(xml);
+        expect(
+          res,
+          `expected all signatures with ${signatureAlgorithm} to be valid, but some reported invalid`,
+        ).to.be.true;
       });
 
-      sig.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#";
-      sig.signatureAlgorithm = signatureAlgorithm;
-      sig.computeSignature(xml);
-      return sig.getSignedXml();
-    }
+      it(`should fail verification of signed xml with ${signatureAlgorithm} after manipulation`, function () {
+        const xml = signWith(signatureAlgorithm);
+        const doc = new xmldom.DOMParser().parseFromString(xml);
+        const node = xpath.select1("//*[local-name(.)='x']", doc);
+        isDomNode.assertIsElementNode(node);
+        const targetElement = node as Element;
+        targetElement.setAttribute("attr", "manipulatedValue");
+        const manipulatedXml = new xmldom.XMLSerializer().serializeToString(doc);
 
-    function loadSignature(xml: string): SignedXml {
-      const doc = new xmldom.DOMParser().parseFromString(xml);
-      const node = xpath.select1(
-        "//*[local-name(.)='Signature' and namespace-uri(.)='http://www.w3.org/2000/09/xmldsig#']",
-        doc,
-      );
-      isDomNode.assertIsNodeLike(node);
-      const sig = new SignedXml();
-      sig.publicCert = fs.readFileSync("./test/static/client_public_ecdsa.pem");
-      sig.loadSignature(node);
-      return sig;
-    }
-
-    it(`should verify signed xml with ${signatureAlgorithm}`, function () {
-      const xml = signWith(signatureAlgorithm);
-      const sig = loadSignature(xml);
-      const res = sig.checkSignature(xml);
-      expect(
-        res,
-        `expected all signatures with ${signatureAlgorithm} to be valid, but some reported invalid`,
-      ).to.be.true;
-    });
-
-    it(`should verify signed xml with ${ecdsaSignatureAlgorithm}`, function () {
-      const xml = signWith(ecdsaSignatureAlgorithm);
-      const sig = loadSignature(xml);
-      const res = sig.checkSignature(xml);
-      expect(
-        res,
-        `expected all signatures with ${ecdsaSignatureAlgorithm} to be valid, but some reported invalid`,
-      ).to.be.true;
-    });
-
-    it(`should fail verification of signed xml with ${signatureAlgorithm} after manipulation`, function () {
-      const xml = signWith(signatureAlgorithm);
-      const doc = new xmldom.DOMParser().parseFromString(xml);
-      const node = xpath.select1("//*[local-name(.)='x']", doc);
-      isDomNode.assertIsElementNode(node);
-      const targetElement = node as Element;
-      targetElement.setAttribute("attr", "manipulatedValue");
-      const manipulatedXml = new xmldom.XMLSerializer().serializeToString(doc);
-
-      const sig = loadSignature(manipulatedXml);
-      const res = sig.checkSignature(manipulatedXml);
-      expect(
-        res,
-        `expected all signatures with ${signatureAlgorithm} to be invalid, but some reported valid`,
-      ).to.be.false;
+        const sig = loadSignature(manipulatedXml);
+        const res = sig.checkSignature(manipulatedXml);
+        expect(
+          res,
+          `expected all signatures with ${signatureAlgorithm} to be invalid, but some reported valid`,
+        ).to.be.false;
+      });
     });
   });
 

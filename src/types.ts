@@ -33,6 +33,7 @@ export type SignatureAlgorithmType =
   | "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256"
   | "http://www.w3.org/2007/05/xmldsig-more#sha256-rsa-MGF1"
   | "http://www.w3.org/2001/04/xmldsig-more#rsa-sha512"
+  | "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha512"
   | "http://www.w3.org/2000/09/xmldsig#hmac-sha1"
   | string;
 
