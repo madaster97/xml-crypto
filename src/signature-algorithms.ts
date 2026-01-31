@@ -56,9 +56,12 @@ export class RsaSha256 implements SignatureAlgorithm {
 export class EcdsaSha256 implements SignatureAlgorithm {
   getSignature = createOptionalCallbackFunction(
     (signedInfo: crypto.BinaryLike, privateKey: crypto.KeyLike): string => {
+      // Maybe the fix for ts-ignore below?
+      // const parsedPrivateKey = crypto.createPrivateKey(privateKey);
       const signer = crypto.createSign("SHA256");
       signer.update(signedInfo);
-      const res = signer.sign(privateKey, "base64");
+      // @ts-ignore
+      const res = signer.sign({key: privateKey, dsaEncoding: 'ieee-p1363'}, "base64");
 
       return res;
     },
@@ -66,9 +69,10 @@ export class EcdsaSha256 implements SignatureAlgorithm {
 
   verifySignature = createOptionalCallbackFunction(
     (material: string, key: crypto.KeyLike, signatureValue: string): boolean => {
+      const publicKey = crypto.createPublicKey(key);
       const verifier = crypto.createVerify("SHA256");
       verifier.update(material);
-      const res = verifier.verify(key, signatureValue, "base64");
+      const res = verifier.verify({key: publicKey, dsaEncoding: 'ieee-p1363'}, signatureValue, "base64");
 
       return res;
     },
